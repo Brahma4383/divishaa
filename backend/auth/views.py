@@ -30,6 +30,52 @@ def home(request):
     return JsonResponse({'status': 'ok', 'message': 'Auth service is running'})
 
 
+def decode_jwt_token(request):
+    auth_header = request.headers.get('Authorization') or request.META.get('HTTP_AUTHORIZATION')
+    if not auth_header or not auth_header.startswith('Bearer '):
+        return None, JsonResponse({'error': 'Authorization header required'}, status=401)
+
+    token = auth_header.split('Bearer ')[1].strip()
+    try:
+        payload = jwt.decode(token, settings.SECRET_KEY, algorithms=['HS256'])
+    except jwt.ExpiredSignatureError:
+        return None, JsonResponse({'error': 'Token expired'}, status=401)
+    except jwt.InvalidTokenError:
+        return None, JsonResponse({'error': 'Invalid token'}, status=401)
+
+    user_id = payload.get('user_id')
+    if not user_id:
+        return None, JsonResponse({'error': 'Invalid token payload'}, status=401)
+
+    try:
+        user = User.objects.get(id=user_id)
+    except User.DoesNotExist:
+        return None, JsonResponse({'error': 'User not found'}, status=401)
+
+    return user, None
+
+
+def profile(request):
+    if request.method != 'GET':
+        return JsonResponse({'error': 'Invalid request method'}, status=405)
+
+    user, error_response = decode_jwt_token(request)
+    if error_response:
+        return error_response
+
+    profile = getattr(user, 'profile', None)
+    role = profile.role if profile else 'customer'
+
+    return JsonResponse({
+        'user': {
+            'id': user.id,
+            'username': user.username,
+            'email': user.email,
+            'role': role,
+        }
+    })
+
+
 @csrf_exempt
 def register(request):
     if request.method != 'POST':
