@@ -1,11 +1,17 @@
 import { useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 
 export default function Login() {
   const navigate = useNavigate();
-  const [form, setForm] = useState({ email: "", password: "", remember: false });
+  const location = useLocation();
+  const [form, setForm] = useState({
+    email: location.state?.email || "",
+    password: "",
+    remember: false,
+  });
   const [errors, setErrors] = useState({});
   const [loading, setLoading] = useState(false);
+  const API_URL = import.meta.env.VITE_API_URL || "http://localhost:8000";
 
   function handleChange(e) {
     const { name, value, type, checked } = e.target;
@@ -29,8 +35,25 @@ export default function Login() {
       return;
     }
     setLoading(true);
+    setErrors({});
+
     try {
-      await new Promise((r) => setTimeout(r, 900)); // replace with real API call
+      const response = await fetch(`${API_URL}/auth/login/`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ email: form.email.trim(), password: form.password }),
+      });
+
+      const data = await response.json();
+      if (!response.ok) {
+        setErrors({ general: data.error || "Invalid email or password. Please try again." });
+        return;
+      }
+
+      localStorage.setItem("authToken", data.token);
+      localStorage.setItem("authUser", JSON.stringify(data.user));
       navigate("/");
     } catch {
       setErrors({ general: "Invalid email or password. Please try again." });

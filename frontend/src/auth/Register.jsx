@@ -9,10 +9,12 @@ export default function Register() {
     email: "",
     password: "",
     confirmPassword: "",
+    role: "customer",
     agreeTerms: false,
   });
   const [errors, setErrors] = useState({});
   const [loading, setLoading] = useState(false);
+  const API_URL = import.meta.env.VITE_API_URL || "http://localhost:8000";
 
   function handleChange(e) {
     const { name, value, type, checked } = e.target;
@@ -29,6 +31,7 @@ export default function Register() {
     if (form.password.length < 8) e.password = "Password must be at least 8 characters";
     if (form.password !== form.confirmPassword) e.confirmPassword = "Passwords do not match";
     if (!form.agreeTerms) e.agreeTerms = "You must agree to the terms";
+    if (!form.role) e.role = "Please select a user role";
     return e;
   }
 
@@ -39,10 +42,34 @@ export default function Register() {
       setErrors(errs);
       return;
     }
+
     setLoading(true);
+    setErrors({});
+
     try {
-      await new Promise((r) => setTimeout(r, 1000)); // replace with real API call
-      navigate("/");
+      const payload = {
+        firstName: form.firstName.trim(),
+        lastName: form.lastName.trim(),
+        email: form.email.trim(),
+        password: form.password,
+        role: form.role,
+      };
+
+      const response = await fetch(`${API_URL}/auth/register/`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(payload),
+      });
+
+      const data = await response.json();
+      if (!response.ok) {
+        setErrors({ general: data.error || "Unable to create account" });
+        return;
+      }
+
+      navigate("/login", { state: { email: form.email.trim() } });
     } catch {
       setErrors({ general: "Something went wrong. Please try again." });
     } finally {
@@ -165,6 +192,26 @@ export default function Register() {
                   ))}
                 </div>
               )}
+            </div>
+
+            {/* Role selector */}
+            <div>
+              <label htmlFor="role" className="mb-2 block text-xs font-medium uppercase tracking-widest text-ink">
+                Account type
+              </label>
+              <select
+                id="role"
+                name="role"
+                value={form.role}
+                onChange={handleChange}
+                className={`w-full border bg-transparent px-4 py-3 text-sm text-ink transition focus:outline-none ${
+                  errors.role ? "border-maroon" : "border-gold-soft focus:border-ink"
+                }`}
+              >
+                <option value="customer">Customer</option>
+                <option value="vendor">Vendor</option>
+              </select>
+              {errors.role && <p className="mt-1 text-xs text-maroon">{errors.role}</p>}
             </div>
 
             {/* Confirm Password */}
