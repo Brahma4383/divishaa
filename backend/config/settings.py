@@ -84,7 +84,7 @@ WSGI_APPLICATION = 'config.wsgi.application'
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.mysql',
-        'NAME': 'Divishaa',
+        'NAME': 'divishaa_couture',
         'USER': 'root',
         'PASSWORD': 'root',
         'HOST': '127.0.0.1',
