@@ -131,3 +131,8 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 STATIC_URL = 'static/'
 STATIC_ROOT = BASE_DIR / 'staticfiles'
+
+# Product uploads are stored outside source code. In production, set this to
+# managed object storage (for example S3 or Cloudinary) behind a CDN.
+MEDIA_URL = '/media/'
+MEDIA_ROOT = BASE_DIR / 'media'

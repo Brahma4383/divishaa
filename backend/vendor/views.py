@@ -3,13 +3,26 @@
 This app intentionally does not use Django REST Framework or Django models.
 """
 import json
+import os
+from uuid import uuid4
 from decimal import Decimal, InvalidOperation
 
+from django.conf import settings
 from django.db import connection, DatabaseError
+from django.core.files.storage import FileSystemStorage
 from django.http import JsonResponse
 from django.views.decorators.csrf import csrf_exempt
 
 from auth.views import add_cors, decode_jwt_token, options_response
+
+DEFAULT_CATEGORIES = (
+    ("Women", "women"),
+    ("Men", "men"),
+    ("Kids", "kids"),
+    ("Shoes", "shoes"),
+    ("Accessories", "accessories"),
+    ("Bags", "bags"),
+)
 
 
 def _json_response(request, payload, status=200):
@@ -30,6 +43,41 @@ def _read_json(request):
         return json.loads(request.body.decode("utf-8") or "{}"), None
     except json.JSONDecodeError:
         return None, _json_response(request, {"error": "Invalid JSON payload"}, 400)
+
+
+def _ensure_default_categories(cursor):
+    """Make the vendor category selector usable on a new, empty database."""
+    cursor.executemany(
+        "INSERT IGNORE INTO categories (name, slug) VALUES (%s, %s)",
+        DEFAULT_CATEGORIES,
+    )
+
+
+@csrf_exempt
+def upload_image_api(request):
+    """Accept one vendor product image uploaded from a local device."""
+    if request.method == "OPTIONS":
+        return options_response(request)
+    _, error = _require_vendor(request)
+    if error:
+        return error
+    if request.method != "POST":
+        return _json_response(request, {"error": "Method not allowed"}, 405)
+
+    image = request.FILES.get("image")
+    if not image:
+        return _json_response(request, {"error": "Choose an image file to upload"}, 400)
+    if image.size > 5 * 1024 * 1024:
+        return _json_response(request, {"error": "Image must be 5 MB or smaller"}, 400)
+    allowed_types = {"image/jpeg", "image/png", "image/webp"}
+    extension = os.path.splitext(image.name)[1].lower()
+    allowed_extensions = {".jpg", ".jpeg", ".png", ".webp"}
+    if image.content_type not in allowed_types or extension not in allowed_extensions:
+        return _json_response(request, {"error": "Use a JPG, PNG, or WebP image"}, 400)
+
+    storage = FileSystemStorage(location=settings.MEDIA_ROOT, base_url=settings.MEDIA_URL)
+    filename = storage.save(f"vendor-products/{uuid4().hex}{extension}", image)
+    return _json_response(request, {"imageUrl": request.build_absolute_uri(storage.url(filename))}, 201)
 
 
 def _product_payload(row):
@@ -113,9 +161,13 @@ def categories_api(request):
         return error
     if request.method != "GET":
         return _json_response(request, {"error": "Method not allowed"}, 405)
-    with connection.cursor() as cursor:
-        cursor.execute("SELECT id, name, slug FROM categories ORDER BY name")
-        categories = [{"id": row[0], "name": row[1], "slug": row[2]} for row in cursor.fetchall()]
+    try:
+        with connection.cursor() as cursor:
+            _ensure_default_categories(cursor)
+            cursor.execute("SELECT id, name, slug FROM categories ORDER BY name")
+            categories = [{"id": row[0], "name": row[1], "slug": row[2]} for row in cursor.fetchall()]
+    except DatabaseError:
+        return _json_response(request, {"error": "Category setup is unavailable. Run backend/schema.sql first."}, 500)
     return _json_response(request, {"categories": categories})
 
 
@@ -167,6 +219,7 @@ def products_api(request):
         return _json_response(request, {"error": "Please correct the highlighted fields", "fields": errors}, 400)
     try:
         with connection.cursor() as cursor:
+            _ensure_default_categories(cursor)
             cursor.execute("SELECT id FROM categories WHERE id = %s", [product["category_id"]])
             if not cursor.fetchone():
                 return _json_response(request, {"error": "Selected category does not exist"}, 400)
@@ -203,6 +256,7 @@ def product_detail_api(request, product_id):
     if errors:
         return _json_response(request, {"error": "Please correct the highlighted fields", "fields": errors}, 400)
     with connection.cursor() as cursor:
+        _ensure_default_categories(cursor)
         cursor.execute("SELECT id FROM categories WHERE id = %s", [product["category_id"]])
         if not cursor.fetchone():
             return _json_response(request, {"error": "Selected category does not exist"}, 400)
