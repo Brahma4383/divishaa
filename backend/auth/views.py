@@ -10,13 +10,14 @@ from django.views.decorators.csrf import csrf_exempt
 
 
 ALLOWED_ROLES = {'customer', 'vendor', 'admin'}
+SELF_REGISTRATION_ROLES = {'customer', 'vendor'}
 
 
 def get_cors_headers(request):
     origin = request.headers.get('Origin') or request.META.get('HTTP_ORIGIN')
     headers = {
         'Access-Control-Allow-Origin': origin or '*',
-        'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+        'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
         'Access-Control-Allow-Headers': 'Content-Type, Authorization',
     }
     if origin:
@@ -260,8 +261,10 @@ def register(request):
         response = JsonResponse({'error': 'Invalid email address'}, status=400)
         return add_cors(response, request)
 
-    if role not in ALLOWED_ROLES:
-        response = JsonResponse({'error': f'role must be one of {sorted(ALLOWED_ROLES)}'}, status=400)
+    # Administrative accounts must be provisioned by an administrator, never
+    # selected from the public registration form.
+    if role not in SELF_REGISTRATION_ROLES:
+        response = JsonResponse({'error': f'role must be one of {sorted(SELF_REGISTRATION_ROLES)}'}, status=400)
         return add_cors(response, request)
 
     if fetch_user_by_email(email):

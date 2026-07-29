@@ -1,4 +1,4 @@
-import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { BrowserRouter, Navigate, Routes, Route } from "react-router-dom";
 import MainLayout from "./layouts/MainLayout";
 import Home from "./customer/Home";
 import Shope from "./customer/Shope";
@@ -6,13 +6,27 @@ import NewArrivals from "./customer/NewArrivals";
 import Categories from "./customer/Categories";
 import Login from "./auth/Login";
 import Register from "./auth/Register";
+import VendorDashboard from "./vendor/VendorDashboard";
+
+function VendorOnly({ children }) {
+  const user = JSON.parse(localStorage.getItem("authUser") || "null");
+  const token = localStorage.getItem("authToken");
+  if (!token || !user) return <Navigate to="/login" replace />;
+  if (user.role !== "vendor" && user.role !== "admin") return <Navigate to="/" replace />;
+  return children;
+}
+
+function CustomerHome() {
+  const user = JSON.parse(localStorage.getItem("authUser") || "null");
+  return user?.role === "vendor" || user?.role === "admin" ? <Navigate to="/vendor" replace /> : <Home />;
+}
 
 export default function App() {
   return (
     <BrowserRouter>
       <Routes>
         <Route element={<MainLayout />}>
-          <Route path="/" element={<Home />} />
+          <Route path="/" element={<CustomerHome />} />
           <Route path="/shop" element={<Shope />} />
           <Route path="/new-arrivals" element={<NewArrivals />} />
           <Route path="/categories" element={<Categories />} />
@@ -24,6 +38,7 @@ export default function App() {
         {/* Auth pages — outside MainLayout so no Navbar/Footer */}
         <Route path="/login" element={<Login />} />
         <Route path="/register" element={<Register />} />
+        <Route path="/vendor" element={<VendorOnly><VendorDashboard /></VendorOnly>} />
       </Routes>
     </BrowserRouter>
   );

@@ -60,7 +60,7 @@ export default function Login() {
 
       localStorage.setItem("authToken", data.token);
       localStorage.setItem("authUser", JSON.stringify(data.user));
-      navigate("/");
+      navigate(data.user.role === "vendor" || data.user.role === "admin" ? "/vendor" : "/");
     } catch {
       setErrors({ general: "Invalid email or password. Please try again." });
     } finally {
