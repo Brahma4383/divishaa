@@ -1,18 +1,50 @@
 /**
  * productService.js
  *
- * Stand-in "API layer" for the Home page. Every function returns a Promise,
- * shaped exactly like a real backend response would be, so swapping the
- * body for a real `fetch("/api/...")` / axios call later is a one-line change.
- * Keeping this in `services/` (not inside components) means components never
- * know or care whether the data came from dummy JSON or a live API.
- *
- * @see ../types/home.js for the shape of Product / Category / Review / Brand
+ * Home-page data is now fetched from the Django customer endpoint.
+ * The view returns the same shape that the UI expects, so the React
+ * components do not need to change.
  */
 
-const DELAY = 600; // simulated network latency, ms
+async function fetchJson(url, options = {}) {
+  const response = await fetch(url, options);
+  if (!response.ok) {
+    const error = await response.text();
+    throw new Error(error || 'Request failed.');
+  }
+  return response.json();
+}
 
-const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+async function fetchHomeData() {
+  return fetchJson('/customer/home/');
+}
+
+export async function getProducts() {
+  const data = await fetchJson('/customer/products/');
+  return data.products || [];
+}
+
+export async function createProduct(payload) {
+  return fetchJson('/customer/products/', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function updateProduct(productId, payload) {
+  return fetchJson(`/customer/products/${productId}/`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function deleteProduct(productId) {
+  return fetchJson(`/customer/products/${productId}/`, {
+    method: 'DELETE',
+  });
+}
 
 /* ---------------------------------- data ---------------------------------- */
 
@@ -132,43 +164,47 @@ function paginate(items, page = 1, pageSize = 8) {
 /* --------------------------------- API ------------------------------------ */
 
 export async function getHeroSlides() {
-  await wait(DELAY / 2);
-  return HERO_SLIDES;
+  const data = await fetchHomeData();
+  return data.slides || [];
 }
 
 export async function getCategories() {
-  await wait(DELAY);
-  return CATEGORIES;
+  const data = await fetchHomeData();
+  return data.categories || [];
 }
 
 /** @param {{page?: number, pageSize?: number, query?: string}} [params] */
 export async function getTrendingProducts(params = {}) {
-  await wait(DELAY);
-  const { page = 1, pageSize = 8, query = "" } = params;
-  const filtered = query
-    ? TRENDING.filter((p) => p.name.toLowerCase().includes(query.toLowerCase()) || p.brand.toLowerCase().includes(query.toLowerCase()))
-    : TRENDING;
-  return paginate(filtered, page, pageSize);
+  const data = await fetchHomeData();
+  const { page = 1, pageSize = 8 } = params;
+  const items = data.trending?.items || [];
+  return {
+    items: items.slice((page - 1) * pageSize, page * pageSize),
+    page,
+    pageSize,
+    totalItems: items.length,
+    totalPages: Math.max(1, Math.ceil(items.length / pageSize)),
+  };
 }
 
 export async function getNewArrivals() {
-  await wait(DELAY);
-  return NEW_ARRIVALS;
+  const data = await fetchHomeData();
+  return data.newArrivals || [];
 }
 
 export async function getBestSellers() {
-  await wait(DELAY);
-  return BEST_SELLERS;
+  const data = await fetchHomeData();
+  return data.bestSellers || [];
 }
 
 export async function getBrands() {
-  await wait(DELAY / 2);
-  return BRANDS;
+  const data = await fetchHomeData();
+  return data.brands || [];
 }
 
 export async function getReviews() {
-  await wait(DELAY);
-  return REVIEWS;
+  const data = await fetchHomeData();
+  return data.reviews || [];
 }
 
 /** @param {string} query */

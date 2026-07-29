@@ -92,7 +92,7 @@ def ensure_user_table():
                 'ALTER TABLE users ADD COLUMN last_name VARCHAR(150) NOT NULL DEFAULT "" AFTER first_name'
             )
 
-        if 'password' not in columns:
+        if 'password' not in columns: 
             if 'password_hash' in columns:
                 cursor.execute(
                     'ALTER TABLE users CHANGE COLUMN password_hash password VARCHAR(128) NOT NULL'

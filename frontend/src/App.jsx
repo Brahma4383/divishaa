@@ -1,9 +1,9 @@
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import MainLayout from "./layouts/MainLayout";
-import Home from "./pages/Home";
-import Shope from "./pages/Shope";
-import NewArrivals from "./pages/NewArrivals";
-import Categories from "./pages/Categories";
+import Home from "./customer/Home";
+import Shope from "./customer/Shope";
+import NewArrivals from "./customer/NewArrivals";
+import Categories from "./customer/Categories";
 import Login from "./auth/Login";
 import Register from "./auth/Register";
 
