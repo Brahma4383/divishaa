@@ -7,6 +7,7 @@ import Categories from "./customer/Categories";
 import Login from "./auth/Login";
 import Register from "./auth/Register";
 import VendorDashboard from "./vendor/VendorDashboard";
+import VendorHome from "./vendor/VendorHome";
 
 function VendorOnly({ children }) {
   const user = JSON.parse(localStorage.getItem("authUser") || "null");
@@ -38,7 +39,8 @@ export default function App() {
         {/* Auth pages — outside MainLayout so no Navbar/Footer */}
         <Route path="/login" element={<Login />} />
         <Route path="/register" element={<Register />} />
-        <Route path="/vendor" element={<VendorOnly><VendorDashboard /></VendorOnly>} />
+        <Route path="/vendor" element={<VendorOnly><VendorHome /></VendorOnly>} />
+        <Route path="/vendor/products" element={<VendorOnly><VendorDashboard /></VendorOnly>} />
       </Routes>
     </BrowserRouter>
   );
