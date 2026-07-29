@@ -32,9 +32,13 @@ export default function App() {
 function ComingSoon({ title }) {
   return (
     <div className="flex min-h-[50vh] flex-col items-center justify-center gap-2 px-6 text-center">
-      <span className="text-xs uppercase tracking-[0.28em] text-gold">Divishaa.couture</span>
+      <span className="text-xs uppercase tracking-[0.28em] text-gold">
+        Divishaa.couture
+      </span>
       <h1 className="font-serif text-3xl font-medium text-ink">{title}</h1>
-      <p className="text-sm text-gray">This page is being tailored. Check back soon.</p>
+      <p className="text-sm text-gray">
+        This page is being tailored. Check back soon.
+      </p>
     </div>
   );
 }
