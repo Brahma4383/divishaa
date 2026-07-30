@@ -21,6 +21,7 @@ export default function VendorDashboard() {
   const [editingId, setEditingId] = useState(null);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
+  const [fieldErrors, setFieldErrors] = useState({});
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
 
@@ -51,7 +52,21 @@ export default function VendorDashboard() {
   })), [categories, products]);
 
   function updateForm(event) {
-    setForm((current) => ({ ...current, [event.target.name]: event.target.value }));
+    const { name, value } = event.target;
+    setForm((current) => ({ ...current, [name]: value }));
+    setFieldErrors((current) => ({ ...current, [name]: "" }));
+  }
+
+  const fieldClass = (name, extra = "") => `border bg-transparent px-3 py-2.5 text-sm transition-colors duration-200 focus:outline-none ${fieldErrors[name] ? "border-maroon bg-maroon/10 text-maroon placeholder:text-maroon/70 hover:bg-maroon/15 focus:border-maroon focus:ring-2 focus:ring-maroon/25" : "border-gold-soft hover:border-ink hover:bg-ivory/70 focus:border-ink focus:ring-2 focus:ring-gold/25"} ${extra}`;
+
+  function validateForm() {
+    const nextErrors = {};
+    if (!form.name.trim()) nextErrors.name = "Enter a product name.";
+    if (!form.categoryId) nextErrors.categoryId = "Choose a category.";
+    if (form.price === "" || Number(form.price) < 0) nextErrors.price = "Enter a valid selling price.";
+    if (form.originalPrice && Number(form.originalPrice) < Number(form.price)) nextErrors.originalPrice = "Original price cannot be lower than selling price.";
+    setFieldErrors(nextErrors);
+    return Object.keys(nextErrors).length === 0;
   }
 
   function toggleSize(size) {
@@ -88,6 +103,10 @@ export default function VendorDashboard() {
     event.preventDefault();
     setMessage("");
     setError("");
+    if (!validateForm()) {
+      setError("Please complete the highlighted fields.");
+      return;
+    }
     const payload = {
       ...form,
       categoryId: Number(form.categoryId),
@@ -103,7 +122,10 @@ export default function VendorDashboard() {
         body: JSON.stringify(payload),
       });
       const data = await response.json();
-      if (!response.ok) throw new Error(data.error || "Unable to save product");
+      if (!response.ok) {
+        if (data.fields) setFieldErrors(data.fields);
+        throw new Error(data.error || "Unable to save product");
+      }
       setMessage(data.message);
       setEditingId(null);
       setForm(EMPTY_PRODUCT);
@@ -139,16 +161,16 @@ export default function VendorDashboard() {
 
         <section className="mt-8 border border-gold-soft bg-white/50 p-6">
           <h2 className="font-serif text-3xl">{editingId ? "Edit product" : "Add a product"}</h2>
-          <form onSubmit={submit} className="mt-6 grid gap-4 md:grid-cols-2">
-            <input required name="name" value={form.name} onChange={updateForm} placeholder="Product name" className="border border-gold-soft bg-transparent px-3 py-2.5 text-sm focus:outline-none" />
-            <select required name="categoryId" value={form.categoryId} onChange={updateForm} className="border border-gold-soft bg-transparent px-3 py-2.5 text-sm focus:outline-none"><option value="">Select category</option>{categories.map((category) => <option key={category.id} value={category.id}>{category.name}</option>)}</select>
-            <input name="brand" value={form.brand} onChange={updateForm} placeholder="Brand" className="border border-gold-soft bg-transparent px-3 py-2.5 text-sm" />
+          <form onSubmit={submit} noValidate className="mt-6 grid gap-4 md:grid-cols-2">
+            <div><input name="name" value={form.name} onChange={updateForm} placeholder="Product name *" aria-invalid={Boolean(fieldErrors.name)} className={`w-full ${fieldClass("name")}`} />{fieldErrors.name && <p className="mt-1 text-xs text-maroon">{fieldErrors.name}</p>}</div>
+            <div><select name="categoryId" value={form.categoryId} onChange={updateForm} aria-invalid={Boolean(fieldErrors.categoryId)} className={`w-full ${fieldClass("categoryId")}`}><option value="">Select category *</option>{categories.map((category) => <option key={category.id} value={category.id}>{category.name}</option>)}</select>{fieldErrors.categoryId && <p className="mt-1 text-xs text-maroon">{fieldErrors.categoryId}</p>}</div>
+            <input name="brand" value={form.brand} onChange={updateForm} placeholder="Brand (optional)" className={fieldClass("brand", "w-full")} />
             <div className="space-y-2"><label className="block text-xs uppercase tracking-widest text-gray">Upload from laptop</label><input type="file" accept="image/jpeg,image/png,image/webp" onChange={uploadImage} disabled={uploading} className="block w-full text-sm text-gray file:mr-3 file:border-0 file:bg-ink file:px-3 file:py-2 file:text-xs file:uppercase file:tracking-widest file:text-ivory hover:file:bg-maroon disabled:opacity-60" /><p className="text-xs text-gray">JPG, PNG, or WebP · max 5 MB {uploading ? "· Uploading…" : ""}</p></div>
-            <div className="md:col-span-2"><label className="mb-2 block text-xs uppercase tracking-widest text-gray">Or add an image URL</label><input type="url" name="image" value={form.image} onChange={updateForm} placeholder="https://example.com/product-image.jpg" className="w-full border border-gold-soft bg-transparent px-3 py-2.5 text-sm" /></div>
+            <div className="md:col-span-2"><label className="mb-2 block text-xs uppercase tracking-widest text-gray">Or add an image URL</label><input type="url" name="image" value={form.image} onChange={updateForm} placeholder="https://example.com/product-image.jpg" className={`w-full ${fieldClass("image")}`} /></div>
             {form.image && <div className="md:col-span-2 flex items-center gap-4 border border-gold-soft p-3"><img src={form.image} alt="Product preview" className="h-20 w-16 object-cover" /><div><p className="text-sm font-medium">Image preview</p><button type="button" onClick={() => setForm((current) => ({ ...current, image: "" }))} className="mt-1 text-xs uppercase tracking-widest text-maroon underline underline-offset-4">Remove image</button></div></div>}
-            <textarea name="description" value={form.description} onChange={updateForm} placeholder="Description" rows="3" className="md:col-span-2 border border-gold-soft bg-transparent px-3 py-2.5 text-sm" />
-            <div className="grid grid-cols-2 gap-4 md:col-span-2"><input required min="0" type="number" name="price" value={form.price} onChange={updateForm} placeholder="Selling price" className="border border-gold-soft bg-transparent px-3 py-2.5 text-sm" /><input min="0" type="number" name="originalPrice" value={form.originalPrice} onChange={updateForm} placeholder="Original price" className="border border-gold-soft bg-transparent px-3 py-2.5 text-sm" /></div>
-            <div><p className="mb-2 text-xs uppercase tracking-widest text-gray">Available sizes</p><div className="flex flex-wrap gap-2">{SIZE_OPTIONS.map((size) => { const selected = form.sizes.split(",").map((item) => item.trim()).includes(size); return <button key={size} type="button" onClick={() => toggleSize(size)} aria-pressed={selected} className={`min-w-10 border px-3 py-2 text-xs font-medium transition ${selected ? "border-ink bg-ink text-ivory" : "border-gold-soft bg-transparent text-ink hover:border-ink"}`}>{size}</button>; })}</div></div><input name="colors" value={form.colors} onChange={updateForm} placeholder="Colors: Red, Blue" className="border border-gold-soft bg-transparent px-3 py-2.5 text-sm self-end" />
+            <textarea name="description" value={form.description} onChange={updateForm} placeholder="Description (optional)" rows="3" className={`md:col-span-2 w-full ${fieldClass("description")}`} />
+            <div className="grid grid-cols-2 gap-4 md:col-span-2"><div><input min="0" type="number" name="price" value={form.price} onChange={updateForm} placeholder="Selling price *" aria-invalid={Boolean(fieldErrors.price)} className={`w-full ${fieldClass("price")}`} />{fieldErrors.price && <p className="mt-1 text-xs text-maroon">{fieldErrors.price}</p>}</div><div><input min="0" type="number" name="originalPrice" value={form.originalPrice} onChange={updateForm} placeholder="Original price (optional)" aria-invalid={Boolean(fieldErrors.originalPrice)} className={`w-full ${fieldClass("originalPrice")}`} />{fieldErrors.originalPrice && <p className="mt-1 text-xs text-maroon">{fieldErrors.originalPrice}</p>}</div></div>
+            <div><p className="mb-2 text-xs uppercase tracking-widest text-gray">Available sizes</p><div className="flex flex-wrap gap-2">{SIZE_OPTIONS.map((size) => { const selected = form.sizes.split(",").map((item) => item.trim()).includes(size); return <button key={size} type="button" onClick={() => toggleSize(size)} aria-pressed={selected} className={`min-w-10 border px-3 py-2 text-xs font-medium transition ${selected ? "border-ink bg-ink text-ivory" : "border-gold-soft bg-transparent text-ink hover:border-ink hover:bg-ivory/70"}`}>{size}</button>; })}</div></div><input name="colors" value={form.colors} onChange={updateForm} placeholder="Colors: Red, Blue (optional)" className={`${fieldClass("colors")} self-end`} />
             <div className="flex gap-3 md:col-span-2"><button className="bg-ink px-5 py-3 text-xs uppercase tracking-widest text-ivory hover:bg-maroon">{editingId ? "Save changes" : "Add product"}</button>{editingId && <button type="button" onClick={() => { setEditingId(null); setForm(EMPTY_PRODUCT); }} className="border border-gold-soft px-5 py-3 text-xs uppercase tracking-widest">Cancel</button>}</div>
           </form>
         </section>

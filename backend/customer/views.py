@@ -54,8 +54,40 @@ def _build_home_payload():
         product_table = "customer_product" if _table_exists(cursor, "customer_product") else "products" if _table_exists(cursor, "products") else None
         review_table = "customer_review" if _table_exists(cursor, "customer_review") else "reviews" if _table_exists(cursor, "reviews") else None
 
+        # The vendor dashboard writes into the schema's `products` and
+        # `categories` tables.  That schema has `image` columns (not the
+        # `image_url` / `product_count` fields used by the older demo tables),
+        # so build the customer catalogue directly from those saved records.
+        vendor_catalogue = product_table == "products" and category_table == "categories"
+
         categories = []
-        if category_table:
+        if vendor_catalogue:
+            category_rows = _fetch_all(cursor, """
+                SELECT c.id, c.name, c.slug,
+                       COUNT(p.id) AS product_count,
+                       COALESCE(
+                           (SELECT latest.image FROM products AS latest
+                            WHERE latest.category_id = c.id
+                              AND latest.image IS NOT NULL AND latest.image <> ''
+                            ORDER BY latest.created_at DESC, latest.id DESC LIMIT 1),
+                           c.image
+                       ) AS image_url
+                FROM categories AS c
+                LEFT JOIN products AS p ON p.category_id = c.id
+                GROUP BY c.id, c.name, c.slug, c.image
+                ORDER BY c.name
+            """)
+            categories = [
+                {
+                    "id": row["slug"],
+                    "name": row["name"],
+                    "slug": row["slug"],
+                    "productCount": int(row.get("product_count") or 0),
+                    "image": row.get("image_url") or DEFAULT_IMAGE,
+                }
+                for row in category_rows
+            ]
+        elif category_table:
             category_sql = f"SELECT id, name, slug, image_url, product_count FROM {category_table} ORDER BY name"
             category_rows = _fetch_all(cursor, category_sql)
             categories = [
@@ -76,7 +108,17 @@ def _build_home_payload():
             brands = [{"id": row["slug"], "name": row["name"]} for row in brand_rows]
 
         products = []
-        if product_table and category_table and brand_table:
+        if vendor_catalogue:
+            product_rows = _fetch_all(cursor, """
+                SELECT p.id, p.name, p.category_id, c.slug AS category_slug,
+                       c.name AS category_name, p.brand AS brand_name, p.price,
+                       p.original_price, p.image AS image_url, p.created_at
+                FROM products AS p
+                INNER JOIN categories AS c ON c.id = p.category_id
+                ORDER BY p.created_at DESC, p.id DESC
+            """)
+            products = [_serialize_product(row) for row in product_rows]
+        elif product_table and category_table and brand_table:
             product_sql = f"""
                 SELECT p.id, p.name, p.slug, p.category_id, c.slug AS category_slug, c.name AS category_name,
                        p.brand_id, b.name AS brand_name, p.price, p.original_price, p.rating,
